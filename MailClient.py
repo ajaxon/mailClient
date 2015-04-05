@@ -1,5 +1,5 @@
 from socket import *
-
+import sys
 
 class MailClient():
     """
@@ -21,9 +21,9 @@ class MailClient():
             code = response[0]
             # Server should reply with 220 if successful connection
             if code != 220:
-                # throw connect error
-                pass
-            print response
+                print "Server connection failed - Error: " + code
+                sys.exit(0)
+            print "Connected: " + response[1]
 
     def connect(self, host, port):
         """
@@ -56,7 +56,9 @@ class MailClient():
         self.socket.send(message)
         response = self.get_response()
         if response[0] != 250:
-            raise Exception
+            print "Error try again"
+            print response[1]
+            sys.exit(0)
 
     def send_mail_from(self, email_from):
         """
@@ -66,8 +68,9 @@ class MailClient():
         self.socket.send("MAIL FROM: %s\r\n" % email_from)
         response = self.get_response()
         if response[0] != 250:
-            pass
-        print response
+            print "There was a problem with the from email"
+            print response[1]
+            sys.exit(0)
 
     def send_rcpt_to(self, email_to):
         """
@@ -77,8 +80,9 @@ class MailClient():
         self.socket.send("RCPT TO: %s\r\n" % email_to)
         response = self.get_response()
         if response[0] != 250:
-            pass
-        print response
+            print "An error has occured. Try correcting the email address you are sending to"
+            print response[1]
+            sys.exit(0)
 
     def send_data(self):
         """
@@ -88,20 +92,26 @@ class MailClient():
         self.socket.send("DATA\r\n")
         response = self.get_response()
         if response[0] != 354:
-            pass
-        print response
+            print "An error has occured try again"
+            print response[1]
+            sys.exit(0)
 
-    def send_message(self, message):
+    def send_message(self, subject, message):
         """
         Send email message contents
         :return:
         """
+        subject = "Subject: %s \n" % subject
         message += "\r\n.\r\n"
-        self.socket.send(message)
+        self.socket.send(subject + message)
         response = self.get_response()
         if response[0] != 250:
-            pass
+            print "There was a problem sending the message try again"
+            print response[1]
+            sys.exit(0)
+        print "Message being sent.. \n"
         print response
+
     def get_response(self):
         """
         Gets response from server
@@ -117,7 +127,25 @@ class MailClient():
 
         return int(code), message
 
-    def send_mail(self, email_to, email_from, email_message):
+    def print_error(self, code):
+        """
+        :param code: 3 digit code
+        :return: void
+        """
+        if code == 500:
+            print "There was a syntax error. Please try again"
+        elif code == 501:
+            print "There was a syntax error in parameters"
+        elif code == 502:
+            print "Error - A command was not implmented. Try again"
+        elif code == 450:
+            print "Mailbox unavailable or busy. Try again later"
+        elif code == 550:
+            "Mailbox not found - Try again"
+        else:
+            print "There was an error try again."
+
+    def send_mail(self, email_to, email_from, email_subject, email_message):
         """
 
         :param email_to: email address being sent to
@@ -137,17 +165,25 @@ class MailClient():
         """
         # send HELO to server
         self.send_helo()
-
+        # send MAIL FROM:
         self.send_mail_from(email_from)
         self.send_rcpt_to(email_to)
         self.send_data()
-        self.send_message(email_message)
+        self.send_message(email_subject, email_message)
 
 
 if __name__ == '__main__':
-    host_name = raw_input("Enter the mailserver name")
+    host_name = "localhost"
     client = MailClient(host_name)
-    mail_to = raw_input("Enter the email address you want to mail")
-    mail_from = raw_input("Enter your email address")
-    mail_message = raw_input("Enter the message you wish to send ")
-    client.send_mail(mail_to, mail_from, mail_message)
+    mail_to = raw_input("Enter the email address you want to mail \n")
+    mail_from = raw_input("Enter your email address \n")
+    mail_subject = raw_input("Enter the subject for the message \n")
+    print "Enter the email message \nEnter a period on a line by itself to end message"
+    mail_message = ""
+    while True:
+        content = sys.stdin.readline()
+        if content.strip() == ".":
+            break
+        mail_message += content
+    client.send_mail(mail_to, mail_from, mail_subject, mail_message)
+    client.quit()
